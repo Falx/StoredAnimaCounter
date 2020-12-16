@@ -8,7 +8,7 @@ This is a first implementation, more visualisation options will be added later.
 
 Example ElvUI
 
-* Go to `/ec`- 
+* Go to `/ec` (ElvUI config panel)
 * `DataTexts`
 * `Panels`
 * Pick a panel and click the dropdown of a `Position`
