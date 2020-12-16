@@ -42,14 +42,15 @@ local defaults = {
 
 function StoredAnimaCounter:OnInitialize()
     print("Addon StoredAnimaCounter Loaded!")
+    StoredAnimaCounter:RegisterEvent("PLAYER_LOGIN", "ScanForStoredAnima")
     StoredAnimaCounter:SetupEventListeners()
     StoredAnimaCounter:SetupDB()
     StoredAnimaCounter:SetupConfig()
-    StoredAnimaCounter:RefreshConfig()
+    -- StoredAnimaCounter:RefreshConfig()
 end
 
 function StoredAnimaCounter:OnEnable()
-    if bucketListener ~= nil then
+    if bucketListener == nil then
         StoredAnimaCounter:SetupEventListeners()
     end
     StoredAnimaCounter:RefreshConfig()
@@ -63,7 +64,6 @@ function StoredAnimaCounter:OnDisable()
 end
 
 function StoredAnimaCounter:SetupEventListeners()
-    StoredAnimaCounter:RegisterEvent("PLAYER_LOGIN", "ScanForStoredAnima")
     bucketListener = StoredAnimaCounter:RegisterBucketEvent("BAG_UPDATE", 0.2, "ScanForStoredAnima")
 end
 
@@ -160,7 +160,7 @@ end
 function StoredAnimaCounter:SetFormat(info, toggle)
     configFormat = toggle
     self.db.profile.format = configFormat
-    StoredAnimaCounter:ScanForStoredAnima(ldbObject.value)
+    StoredAnimaCounter:outputValue(ldbObject.value)
 end
 
 function StoredAnimaCounter:GetFormat(info)
