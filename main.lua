@@ -88,26 +88,53 @@ function StoredAnimaCounter:SetupConfig()
         name = addonName,
         handler = StoredAnimaCounter,
         type = "group",
+        childGroups = "tree",
         args = {
             config = {
                 name = "Configuration",
                 desc = "Opens the SAC Configuration panel",
                 type = "execute",
-                func = "OpenConfigPanel"
+                func = "OpenConfigPanel",
+                guiHidden = true
             },
-            verbose = {
-                name = "Toggle chat output",
-                desc = "Toggles verbose output in chat",
-                type = "toggle",
-                set = "SetVerbose",
-                get = "GetVerbose"
-            },
-            format = {
-                name = "Choose output format",
-                type = "select",
-                values = FormatLabels,
-                set = "SetFormat",
-                get = "GetFormat"
+            general = {
+                name = "General",
+                type = "group",
+                handler = StoredAnimaCounter,
+                args = {
+                    headerFormat = {
+                        name = "Formatting",
+                        type = "header",
+                        order = 1
+                    },
+                    format = {
+                        name = "Choose output format",
+                        type = "select",
+                        values = FormatLabels,
+                        set = "SetFormat",
+                        get = "GetFormat",
+                        width = "full",
+                        order = 2
+                    },
+                    formatDesc = {
+                        name = "\nChoose a format to adapt how the value of Stored Anima is displayed. There are several options: \n    stored = 100\n    stored_plus_pool = 100 (4900)\n    pool_plus_stored = 4900 (100)\n    sum_only = 5000\n    sum_plus_stored = 5000 (100)\n    stored_plus_sum = 100 (5000)\n    pool_plus_sum = 4900 (5000)",
+                        type = "description",
+                        order = 3
+                    },
+                    headerVerbose = {
+                        name = "Extra toggles",
+                        type = "header",
+                        order = 4
+                    },
+                    verbose = {
+                        name = "Enable chat output",
+                        desc = "Toggle verbose output in chat",
+                        type = "toggle",
+                        set = "SetVerbose",
+                        get = "GetVerbose",
+                        order = 5
+                    }
+                }
             }
         }
     }
