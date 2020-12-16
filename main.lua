@@ -1,4 +1,4 @@
-local StoredAnimaCounter = LibStub("AceAddon-3.0"):NewAddon("StoredAnimaCounter", "AceBucket-3.0")
+local StoredAnimaCounter = LibStub("AceAddon-3.0"):NewAddon("StoredAnimaCounter", "AceBucket-3.0", "AceEvent-3.0")
 local AceDB = LibStub("AceDB-3.0")
 local AceConfig = LibStub("AceConfig-3.0")
 local AceConfigDialog = LibStub("AceConfigDialog-3.0")
@@ -63,6 +63,7 @@ function StoredAnimaCounter:OnDisable()
 end
 
 function StoredAnimaCounter:SetupEventListeners()
+    StoredAnimaCounter:RegisterEvent("PLAYER_LOGIN", "ScanForStoredAnima")
     bucketListener = StoredAnimaCounter:RegisterBucketEvent("BAG_UPDATE", 0.2, "ScanForStoredAnima")
 end
 
@@ -76,7 +77,6 @@ function StoredAnimaCounter:SetupDB()
 end
 
 function StoredAnimaCounter:RefreshConfig()
-    print('called')
     configIsVerbose = self.db.profile.verbose
     configFormat = self.db.profile.format
     StoredAnimaCounter:ScanForStoredAnima()
