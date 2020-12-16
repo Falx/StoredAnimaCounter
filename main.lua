@@ -1,4 +1,5 @@
 local StoredAnimaCounter = LibStub("AceAddon-3.0"):NewAddon("StoredAnimaCounter", "AceBucket-3.0")
+local AceDB = LibStub("AceDB-3.0")
 local AceConfig = LibStub("AceConfig-3.0")
 local AceConfigDialog = LibStub("AceConfigDialog-3.0")
 local ldb = LibStub:GetLibrary("LibDataBroker-1.1")
@@ -23,32 +24,35 @@ local Format = {
 
 }
 
-local FormatLabels = {
-    "stored_only",
-    "stored_plus_pool",
-    "pool_plus_stored",
-    "sum_only",
-    "sum_plus_stored",
-    "stored_plus_sum",
-    "pool_plus_sum"
-}
+local FormatLabels = {"stored_only", "stored_plus_pool", "pool_plus_stored", "sum_only", "sum_plus_stored",
+                      "stored_plus_sum", "pool_plus_sum"}
 
 local configIsVerbose = false
 local configFormat = Format.stored
 local addonName = "Stored Anima Counter"
 
+local defaults = {
+    profile = {
+        format = Format.stored,
+        verbose = false
+    }
+}
+
 -- Lifecycle functions
 
 function StoredAnimaCounter:OnInitialize()
     print("Addon StoredAnimaCounter Loaded!")
-    StoredAnimaCounter:SetupConfig()
     StoredAnimaCounter:SetupEventListeners()
+    StoredAnimaCounter:SetupDB()
+    StoredAnimaCounter:SetupConfig()
+    StoredAnimaCounter:RefreshConfig()
 end
 
 function StoredAnimaCounter:OnEnable()
     if bucketListener ~= nil then
         StoredAnimaCounter:SetupEventListeners()
     end
+    StoredAnimaCounter:RefreshConfig()
 end
 
 function StoredAnimaCounter:OnDisable()
@@ -62,37 +66,54 @@ function StoredAnimaCounter:SetupEventListeners()
     bucketListener = StoredAnimaCounter:RegisterBucketEvent("BAG_UPDATE", 0.2, "ScanForStoredAnima")
 end
 
+-- DB functions
+
+function StoredAnimaCounter:SetupDB()
+    self.db = AceDB:New("StoredAnimaCounterDB", defaults)
+    self.db.RegisterCallback(self, "OnProfileChanged", "RefreshConfig")
+    self.db.RegisterCallback(self, "OnProfileCopied", "RefreshConfig")
+    self.db.RegisterCallback(self, "OnProfileReset", "RefreshConfig")
+end
+
+function StoredAnimaCounter:RefreshConfig()
+    print('called')
+    configIsVerbose = self.db.profile.verbose
+    configFormat = self.db.profile.format
+    StoredAnimaCounter:ScanForStoredAnima()
+end
+
 -- Config functions
-function StoredAnimaCounter:SetupConfig() 
-    local options =  {
+function StoredAnimaCounter:SetupConfig()
+    local options = {
         name = addonName,
         handler = StoredAnimaCounter,
         type = "group",
         args = {
-          config = {
-              name = "Configuration",
-              desc = "Opens the SAC Configuration panel",
-              type = "execute",
-              func = "OpenConfigPanel"
-          },
-          verbose = {
-            name = "Toggle chat output",
-            desc = "Toggles verbose output in chat",
-            type = "toggle",
-            set = "SetVerbose",
-            get = "GetVerbose"
-          },
-          format = {
-            name = "Choose output format",
-            type = "select",
-            values = FormatLabels,
-            set = "SetFormat",
-            get = "GetFormat"
-          }
+            config = {
+                name = "Configuration",
+                desc = "Opens the SAC Configuration panel",
+                type = "execute",
+                func = "OpenConfigPanel"
+            },
+            verbose = {
+                name = "Toggle chat output",
+                desc = "Toggles verbose output in chat",
+                type = "toggle",
+                set = "SetVerbose",
+                get = "GetVerbose"
+            },
+            format = {
+                name = "Choose output format",
+                type = "select",
+                values = FormatLabels,
+                set = "SetFormat",
+                get = "GetFormat"
+            }
         }
-      }
-      AceConfig:RegisterOptionsTable(addonName, options, {"storedanimacounter", "sac"})
-      configPath = AceConfigDialog:AddToBlizOptions(addonName)
+    }
+    options.args.profiles = LibStub("AceDBOptions-3.0"):GetOptionsTable(self.db)
+    AceConfig:RegisterOptionsTable(addonName, options, {"storedanimacounter", "sac"})
+    configPath = AceConfigDialog:AddToBlizOptions(addonName)
 end
 
 function StoredAnimaCounter:OpenConfigPanel(info)
@@ -100,9 +121,9 @@ function StoredAnimaCounter:OpenConfigPanel(info)
     InterfaceOptionsFrame_OpenToCategory(addonName)
 end
 
-
 function StoredAnimaCounter:SetVerbose(info, toggle)
     configIsVerbose = toggle
+    self.db.profile.verbose = configIsVerbose
 end
 
 function StoredAnimaCounter:GetVerbose(info)
@@ -111,6 +132,7 @@ end
 
 function StoredAnimaCounter:SetFormat(info, toggle)
     configFormat = toggle
+    self.db.profile.format = configFormat
     StoredAnimaCounter:ScanForStoredAnima(ldbObject.value)
 end
 
@@ -132,7 +154,7 @@ function StoredAnimaCounter:ScanForStoredAnima()
     StoredAnimaCounter:outputValue(total)
 end
 
-function StoredAnimaCounter:outputValue(stored) 
+function StoredAnimaCounter:outputValue(stored)
     vprint(">> Total stored anima: " .. stored)
     local currencyID = C_CovenantSanctumUI.GetAnimaInfo()
     local pool = C_CurrencyInfo.GetCurrencyInfo(currencyID).quantity
@@ -187,9 +209,8 @@ function StoredAnimaCounter:doForItemInBag(bag, slot)
         tooltip:ClearLines()
         tooltip:SetBagItem(bag, slot)
 
-
         local isAnima = false
-        for j=1,#tooltip.tipText do
+        for j = 1, #tooltip.tipText do
             local t = tooltip.tipText[j]:GetText()
             -- Anima isn't matching the tooltip text properly, so have to search on substring
             if t and itemClassID == LE_ITEM_CLASS_MISCELLANEOUS and itemSubClassID == LE_ITEM_MISCELLANEOUS_OTHER and
@@ -205,14 +226,15 @@ function StoredAnimaCounter:doForItemInBag(bag, slot)
             totalAnima = (itemCount or 1) * isAnima
             vprint("Anima present: " .. totalAnima .. " on " .. itemLink)
         end
-        tooltip:Hide()        
+        tooltip:Hide()
     end
     return totalAnima
 end
 
-
 function vprint(val)
-   if configIsVerbose then print(val) end
+    if configIsVerbose then
+        print(val)
+    end
 end
 
 function ldbObject:OnTooltipShow()

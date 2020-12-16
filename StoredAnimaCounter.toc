@@ -3,6 +3,7 @@
 ## Author: Falx
 ## Version: 1.0.0
 ## Notes: Counts stored anima in your bags
+## SavedVariables: StoredAnimaCounterDB
 ## X-Category: Bags & Inventory
 
 embeds.xml
