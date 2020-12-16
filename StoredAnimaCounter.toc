@@ -1,0 +1,10 @@
+## Interface: 90002
+## Title: StoredAnimaCounter
+## Author: Falx
+## Version: 1.0
+## Notes: Counts stored anima in your bags
+## X-Category: Bags & Inventory
+
+embeds.xml
+
+main.xml
