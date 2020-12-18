@@ -50,7 +50,7 @@ end
 function StoredAnimaCounter:OnEnable()
     -- StoredAnimaCounter:RegisterEvent("PLAYER_LOGIN", "ScanForStoredAnima")
     self.ScanForStoredAnima()
-    self:RegisterEvent("CURRENCY_DISPLAY_UPDATE", "outputValue") -- When spending anima on the anima conductor
+    self:RegisterEvent("CURRENCY_DISPLAY_UPDATE", "ScanForStoredAnima") -- When spending anima on the anima conductor
     if bucketListener == nil then
         bucketListener = StoredAnimaCounter:RegisterBucketEvent("BAG_UPDATE", 0.2, "ScanForStoredAnima")
     end
