@@ -50,6 +50,7 @@ end
 function StoredAnimaCounter:OnEnable()
     -- StoredAnimaCounter:RegisterEvent("PLAYER_LOGIN", "ScanForStoredAnima")
     self.ScanForStoredAnima()
+    self:RegisterEvent("CURRENCY_DISPLAY_UPDATE", "outputValue") -- When spending anima on the anima conductor
     if bucketListener == nil then
         bucketListener = StoredAnimaCounter:RegisterBucketEvent("BAG_UPDATE", 0.2, "ScanForStoredAnima")
     end
@@ -221,31 +222,29 @@ function StoredAnimaCounter:doForItemInBag(bag, slot)
     local itemId = GetContainerItemID(bag, slot)
     local _, itemCount = GetContainerItemInfo(bag, slot)
     local totalAnima = 0
-    local animaCount = 0;
     if itemId ~= nil then
         local itemLink = select(2, GetItemInfo(itemId))
-        local itemClassID, itemSubClassID = select(12, GetItemInfo(itemId))
         tooltip = tooltip or StoredAnimaCounter:ttCreate()
         tooltip:SetOwner(UIParent, "ANCHOR_NONE")
         tooltip:ClearLines()
         tooltip:SetBagItem(bag, slot)
 
-        local isAnima = false
-        for j = 1, #tooltip.tipText do
-            local t = tooltip.tipText[j]:GetText()
-            -- Anima isn't matching the tooltip text properly, so have to search on substring
-            if t and itemClassID == LE_ITEM_CLASS_MISCELLANEOUS and itemSubClassID == LE_ITEM_MISCELLANEOUS_OTHER and
-                t:find(ANIMA .. "|r$") then
-                isAnima = true
-            elseif t and isAnima and t:find("^Use") then
-                local num = t:match("%d+")
-                animaCount = tonumber(num or "")
+        if C_Item.IsAnimaItemByID(itemId) then
+            local animaCount = 0;
+            for j = 2, #tooltip.tipText do
+                local t = tooltip.tipText[j]:GetText()
+                -- Anima isn't matching the tooltip text properly, so have to search on substring
+                if t and t:find("^Use") then
+                    local num = t:match("%d+")
+                    animaCount = tonumber(num or "")
+                    break
+                end
             end
-        end
 
-        if isAnima and (animaCount > 0) then
-            totalAnima = (itemCount or 1) * animaCount
-            vprint("Anima present: " .. totalAnima .. " on " .. itemLink)
+            if (animaCount > 0) then
+                totalAnima = (itemCount or 1) * animaCount
+                vprint("Anima present: " .. totalAnima .. " on " .. itemLink)
+            end
         end
         tooltip:Hide()
     end
