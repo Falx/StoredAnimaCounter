@@ -1,6 +1,8 @@
 local addonName, addonTable = ...;
 local StoredAnimaCounter = LibStub("AceAddon-3.0"):NewAddon(addonName, "AceBucket-3.0", "AceEvent-3.0")
 
+local _G = _G
+local BreakUpLargeNumbers = BreakUpLargeNumbers
 local AceDB = LibStub("AceDB-3.0")
 local AceConfig = LibStub("AceConfig-3.0")
 local AceConfigDialog = LibStub("AceConfigDialog-3.0")
@@ -29,13 +31,17 @@ local FormatLabels = {"stored_only", "stored_plus_pool", "pool_plus_stored", "su
 
 local tooltip = nil
 local bucketListener = nil
+local worldListener = nil
+local currListener = nil
 local configIsVerbose = false
 local configFormat = Format.stored
+local configBreakLargeNumbers = true
 
 local defaults = {
     profile = {
         format = Format.stored,
-        verbose = false
+        verbose = false,
+        breakLargeNumbers = true
     }
 }
 
@@ -48,18 +54,34 @@ function StoredAnimaCounter:OnInitialize()
 end
 
 function StoredAnimaCounter:OnEnable()
-    -- StoredAnimaCounter:RegisterEvent("PLAYER_LOGIN", "ScanForStoredAnima")
-    self.ScanForStoredAnima()
-    self:RegisterEvent("CURRENCY_DISPLAY_UPDATE", "ScanForStoredAnima") -- When spending anima on the anima conductor
-    if bucketListener == nil then
-        bucketListener = StoredAnimaCounter:RegisterBucketEvent("BAG_UPDATE", 0.2, "ScanForStoredAnima")
+    if worldListener == nil then
+        worldListener = self:RegisterEvent("PLAYER_ENTERING_WORLD", "ScanForStoredAnima")
     end
+
+    if currListener == nil then
+        currListener = self:RegisterEvent("CURRENCY_DISPLAY_UPDATE", "ScanForStoredAnima") -- When spending anima on the anima conductor\
+    end
+
+    if bucketListener == nil then
+        bucketListener = self:RegisterBucketEvent("BAG_UPDATE", 0.2, "ScanForStoredAnima")
+    end
+
     StoredAnimaCounter:RefreshConfig()
 end
 
 function StoredAnimaCounter:OnDisable()
+    if worldListener then
+        self:UnregisterEvent(worldListener)
+        worldListener = nil
+    end
+
+    if currListener then
+        self:UnregisterEvent(currListener)
+        currListener = nil
+    end
+
     if bucketListener then
-        StoredAnimaCounter:UnregisterBucket(bucketListener)
+        self:UnregisterBucket(bucketListener)
         bucketListener = nil
     end
 end
@@ -110,10 +132,18 @@ function StoredAnimaCounter:SetupConfig()
                         type = "description",
                         order = 3
                     },
+                    largeNumbers = {
+                        name = "Break down large numbers",
+                        desc = "Type large number using separators",
+                        type = "toggle",
+                        set = "SetBreakLargeNumbers",
+                        get = "GetBreakLargeNumbers",
+                        order = 4
+                    },
                     headerVerbose = {
                         name = "Extra toggles",
                         type = "header",
-                        order = 4
+                        order = 5
                     },
                     verbose = {
                         name = "Enable chat output",
@@ -121,7 +151,7 @@ function StoredAnimaCounter:SetupConfig()
                         type = "toggle",
                         set = "SetVerbose",
                         get = "GetVerbose",
-                        order = 5
+                        order = 6
                     }
                 }
             }
@@ -136,6 +166,7 @@ end
 function StoredAnimaCounter:RefreshConfig()
     configIsVerbose = self.db.profile.verbose
     configFormat = self.db.profile.format
+    configBreakLargeNumbers = self.db.profile.breakLargeNumbers
     StoredAnimaCounter:ScanForStoredAnima()
 end
 
@@ -146,7 +177,7 @@ end
 
 function StoredAnimaCounter:SetVerbose(info, toggle)
     configIsVerbose = toggle
-    self.db.profile.verbose = configIsVerbose
+    self.db.profile.verbose = toggle
 end
 
 function StoredAnimaCounter:GetVerbose(info)
@@ -155,12 +186,22 @@ end
 
 function StoredAnimaCounter:SetFormat(info, toggle)
     configFormat = toggle
-    self.db.profile.format = configFormat
+    self.db.profile.format = toggle
     StoredAnimaCounter:outputValue(ldbObject.value)
 end
 
 function StoredAnimaCounter:GetFormat(info)
     return configFormat
+end
+
+function StoredAnimaCounter:SetBreakLargeNumbers(info, toggle)
+    configBreakLargeNumbers = toggle
+    self.db.profile.breakLargeNumbers = toggle
+    StoredAnimaCounter:outputValue(ldbObject.value)
+end
+
+function StoredAnimaCounter:GetBreakLargeNumbers(info)
+    return configBreakLargeNumbers
 end
 
 -- Anima functions
@@ -177,31 +218,40 @@ function StoredAnimaCounter:ScanForStoredAnima()
     StoredAnimaCounter:outputValue(total)
 end
 
-function StoredAnimaCounter:outputValue(stored)
+function StoredAnimaCounter:outputValue(storedAnima)
+    local stored, pool, sum 
+    if configBreakLargeNumbers then 
+        stored = BreakUpLargeNumbers(storedAnima)
+        pool = BreakUpLargeNumbers(GetReservoirAnima())
+        sum = BreakUpLargeNumbers(GetReservoirAnima() + storedAnima)
+    else 
+        stored = storedAnima
+        pool = GetReservoirAnima()
+        sum = GetReservoirAnima() + storedAnima
+    end
+
     vprint(">> Total stored anima: " .. stored)
-    local pool = GetReservoirAnima()
-    local sum = pool + stored
     if configFormat == Format.stored then
         ldbObject.value = stored
-        ldbObject.text = string.format("%d", stored)
+        ldbObject.text = string.format("%s", stored)
     elseif configFormat == Format.stored_plus_pool then
         ldbObject.value = stored
-        ldbObject.text = string.format("%d (%d)", stored, pool)
+        ldbObject.text = string.format("%s (%s)", stored, pool)
     elseif configFormat == Format.pool_plus_stored then
         ldbObject.value = stored
-        ldbObject.text = string.format("%d (%d)", pool, stored)
+        ldbObject.text = string.format("%s (%s)", pool, stored)
     elseif configFormat == Format.sum_only then
         ldbObject.value = stored
-        ldbObject.text = string.format("%d", sum)
+        ldbObject.text = string.format("%s", sum)
     elseif configFormat == Format.sum_plus_stored then
         ldbObject.value = stored
-        ldbObject.text = string.format("%d (%d)", sum, stored)
+        ldbObject.text = string.format("%s (%s)", sum, stored)
     elseif configFormat == Format.stored_plus_sum then
         ldbObject.value = stored
-        ldbObject.text = string.format("%d (%d)", stored, sum)
+        ldbObject.text = string.format("%s (%s)", stored, sum)
     elseif configFormat == Format.pool_plus_sum then
         ldbObject.value = stored
-        ldbObject.text = string.format("%d (%d)", pool, sum)
+        ldbObject.text = string.format("%s (%s)", pool, sum)
     end
 end
 
@@ -265,11 +315,32 @@ end
 local NORMAL_FONT_COLOR = {1.0, 0.82, 0.0}
 
 function ldbObject:OnTooltipShow()
+    local stored, pool, sum 
+    if configBreakLargeNumbers then 
+        stored = BreakUpLargeNumbers(ldbObject.value)
+        pool = BreakUpLargeNumbers(GetReservoirAnima())
+        sum = BreakUpLargeNumbers(GetReservoirAnima() + ldbObject.value)
+    else 
+        stored = ldbObject.value
+        pool = GetReservoirAnima()
+        sum = GetReservoirAnima() + ldbObject.value
+    end
+
     self:AddLine("|cFF2C94FEStored Anima|r")
     self:AddLine("An overview of anima stored in your bags, but not yet added to your covenant's reservoir.", 1.0, 0.82,
         0.0, 1)
     self:AddLine("\n")
-    self:AddDoubleLine("Stored:", "|cFFFFFFFF" .. ldbObject.value .. "|r")
-    self:AddDoubleLine("Reservoir:", "|cFFFFFFFF" .. GetReservoirAnima() .. "|r")
-    self:AddDoubleLine("Total:", "|cFFFFFFFF" .. ldbObject.value + GetReservoirAnima() .. "|r")
+    self:AddDoubleLine("Stored:", "|cFFFFFFFF" .. stored .. "|r")
+    self:AddDoubleLine("Reservoir:", "|cFFFFFFFF" .. pool .. "|r")
+    self:AddDoubleLine("Total:", "|cFFFFFFFF" .. sum .. "|r")
 end
+
+function ldbObject:OnClick(button)
+    if "RightButton" == button then
+        StoredAnimaCounter:OpenConfigPanel()
+    elseif "LeftButton" == button then
+        _G.ToggleCharacter('TokenFrame')
+    end
+end
+
+
