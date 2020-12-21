@@ -48,14 +48,14 @@ local defaults = {
 -- Lifecycle functions
 
 function StoredAnimaCounter:OnInitialize()
-    print("Addon " .. addonName .. " Loaded!")
     StoredAnimaCounter:SetupDB()
     StoredAnimaCounter:SetupConfig()
+    print("Addon " .. addonName .. " loaded!")
 end
 
 function StoredAnimaCounter:OnEnable()
     if worldListener == nil then
-        worldListener = self:RegisterEvent("PLAYER_ENTERING_WORLD", "ScanForStoredAnima")
+        worldListener = self:RegisterEvent("PLAYER_ENTERING_WORLD", "ScanForStoredAnimaDelayed")
     end
 
     if currListener == nil then
@@ -206,6 +206,10 @@ end
 
 -- Anima functions
 
+function StoredAnimaCounter:ScanForStoredAnimaDelayed()
+    SAC__wait(10, StoredAnimaCounter.ScanForStoredAnima, time())
+end
+
 function StoredAnimaCounter:ScanForStoredAnima()
     vprint("Scanning:")
     local total = 0
@@ -343,4 +347,33 @@ function ldbObject:OnClick(button)
     end
 end
 
+local waitTable = {};
+local waitFrame = nil;
 
+function SAC__wait(delay, func, ...)
+  if(type(delay)~="number" or type(func)~="function") then
+    return false;
+  end
+  if(waitFrame == nil) then
+    waitFrame = CreateFrame("Frame","WaitFrame", UIParent);
+    waitFrame:SetScript("onUpdate",function (self,elapse)
+      local count = #waitTable;
+      local i = 1;
+      while(i<=count) do
+        local waitRecord = tremove(waitTable,i);
+        local d = tremove(waitRecord,1);
+        local f = tremove(waitRecord,1);
+        local p = tremove(waitRecord,1);
+        if(d>elapse) then
+          tinsert(waitTable,i,{d-elapse,f,p});
+          i = i + 1;
+        else
+          count = count - 1;
+          f(unpack(p));
+        end
+      end
+    end);
+  end
+  tinsert(waitTable,{delay,func,{...}});
+  return true;
+end
