@@ -284,7 +284,7 @@ function StoredAnimaCounter:doForItemInBag(bag, slot)
             for j = 2, #tooltip.tipText do
                 local t = tooltip.tipText[j]:GetText()
                 -- Anima isn't matching the tooltip text properly, so have to search on substring
-                if t and t:find("^Use") then
+                if t and t:find("^"..ITEM_SPELL_TRIGGER_ONUSE) then
                     local num = t:match("%d+")
                     animaCount = tonumber(num or "")
                     break
