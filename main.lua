@@ -12,7 +12,7 @@ local ldbObject = LDB:NewDataObject("Stored Anima", {
     type = "data source",
     text = "-",
     value = 0,
-    label = "Stored Anima"
+    label = "Anima"
 })
 
 local Format = {
@@ -36,12 +36,14 @@ local currListener = nil
 local configIsVerbose = false
 local configFormat = Format.stored
 local configBreakLargeNumbers = true
+local configShowLabel = true
 
 local defaults = {
     profile = {
         format = Format.stored,
         verbose = false,
-        breakLargeNumbers = true
+        breakLargeNumbers = true,
+        showLabel = true
     }
 }
 
@@ -145,13 +147,21 @@ function StoredAnimaCounter:SetupConfig()
                         type = "header",
                         order = 5
                     },
+                    label = {
+                        name = "Show label",
+                        desc = "Show label in front of output",
+                        type = "toggle",
+                        set = "SetShowLabel",
+                        get = "GetShowLabel",
+                        order = 6
+                    },
                     verbose = {
                         name = "Enable chat output",
                         desc = "Toggle verbose output in chat",
                         type = "toggle",
                         set = "SetVerbose",
                         get = "GetVerbose",
-                        order = 6
+                        order = 7
                     }
                 }
             }
@@ -167,6 +177,7 @@ function StoredAnimaCounter:RefreshConfig()
     configIsVerbose = self.db.profile.verbose
     configFormat = self.db.profile.format
     configBreakLargeNumbers = self.db.profile.breakLargeNumbers
+    configShowLabel = self.db.profile.showLabel
     StoredAnimaCounter:ScanForStoredAnima()
 end
 
@@ -204,6 +215,16 @@ function StoredAnimaCounter:GetBreakLargeNumbers(info)
     return configBreakLargeNumbers
 end
 
+function StoredAnimaCounter:SetShowLabel(info, toggle)
+    configShowLabel = toggle
+    self.db.profile.showLabel = toggle
+    StoredAnimaCounter:outputValue(ldbObject.value)
+end
+
+function StoredAnimaCounter:GetShowLabel(info)
+    return configShowLabel
+end
+
 -- Anima functions
 
 function StoredAnimaCounter:ScanForStoredAnimaDelayed()
@@ -223,40 +244,57 @@ function StoredAnimaCounter:ScanForStoredAnima()
 end
 
 function StoredAnimaCounter:outputValue(storedAnima)
-    local stored, pool, sum 
-    if configBreakLargeNumbers then 
+    local stored, pool, sum
+
+    -- Breakdown large numbers
+    if configBreakLargeNumbers then
         stored = BreakUpLargeNumbers(storedAnima)
         pool = BreakUpLargeNumbers(GetReservoirAnima())
         sum = BreakUpLargeNumbers(GetReservoirAnima() + storedAnima)
-    else 
+    else
         stored = storedAnima
         pool = GetReservoirAnima()
         sum = GetReservoirAnima() + storedAnima
     end
 
-    vprint(">> Total stored anima: " .. stored)
-    if configFormat == Format.stored then
-        ldbObject.value = stored
-        ldbObject.text = string.format("%s", stored)
-    elseif configFormat == Format.stored_plus_pool then
-        ldbObject.value = stored
-        ldbObject.text = string.format("%s (%s)", stored, pool)
-    elseif configFormat == Format.pool_plus_stored then
-        ldbObject.value = stored
-        ldbObject.text = string.format("%s (%s)", pool, stored)
-    elseif configFormat == Format.sum_only then
-        ldbObject.value = stored
-        ldbObject.text = string.format("%s", sum)
-    elseif configFormat == Format.sum_plus_stored then
-        ldbObject.value = stored
-        ldbObject.text = string.format("%s (%s)", sum, stored)
-    elseif configFormat == Format.stored_plus_sum then
-        ldbObject.value = stored
-        ldbObject.text = string.format("%s (%s)", stored, sum)
-    elseif configFormat == Format.pool_plus_sum then
-        ldbObject.value = stored
-        ldbObject.text = string.format("%s (%s)", pool, sum)
+    -- Show label
+    if configShowLabel then
+        ldbObject.text = string.format("|cFF2C94FE%s:|r ", ldbObject.label)
+    else
+        ldbObject.text = ""
     end
+
+    -- Update values
+    vprint(">> Total stored anima: " .. stored)
+    ldbObject.value = stored
+    if configFormat == Format.stored then
+        ldbObject.text = ldbObject.text .. string.format("%s", stored)
+    elseif configFormat == Format.stored_plus_pool then
+        ldbObject.text = ldbObject.text .. string.format("%s (%s)", stored, pool)
+    elseif configFormat == Format.pool_plus_stored then
+        ldbObject.text = ldbObject.text .. string.format("%s (%s)", pool, stored)
+    elseif configFormat == Format.sum_only then
+        ldbObject.text = ldbObject.text .. string.format("%s", sum)
+    elseif configFormat == Format.sum_plus_stored then
+        ldbObject.text = ldbObject.text .. string.format("%s (%s)", sum, stored)
+    elseif configFormat == Format.stored_plus_sum then
+        ldbObject.text = ldbObject.text .. string.format("%s (%s)", stored, sum)
+    elseif configFormat == Format.pool_plus_sum then
+        ldbObject.text = ldbObject.text .. string.format("%s (%s)", pool, sum)
+    end
+
+    -- Hack for controlling label display settings in ElvUI (which shows by default on strlen < 3)
+    local len = #ldbObject.text
+    if len < 3 then
+        ldbObject.text = " " .. ldbObject.text
+    end
+    if len < 2 then
+        ldbObject.text = ldbObject.text .. " "
+    end
+    if len < 1 then
+        ldbObject.text = "-"
+    end
+
 end
 
 function StoredAnimaCounter:ttCreate()
@@ -288,7 +326,7 @@ function StoredAnimaCounter:doForItemInBag(bag, slot)
             for j = 2, #tooltip.tipText do
                 local t = tooltip.tipText[j]:GetText()
                 -- Anima isn't matching the tooltip text properly, so have to search on substring
-                if t and t:find("^"..ITEM_SPELL_TRIGGER_ONUSE) then
+                if t and t:find("^" .. ITEM_SPELL_TRIGGER_ONUSE) then
                     local num = t:match("%d+")
                     animaCount = tonumber(num or "")
                     break
@@ -319,12 +357,12 @@ end
 local NORMAL_FONT_COLOR = {1.0, 0.82, 0.0}
 
 function ldbObject:OnTooltipShow()
-    local stored, pool, sum 
-    if configBreakLargeNumbers then 
+    local stored, pool, sum
+    if configBreakLargeNumbers then
         stored = BreakUpLargeNumbers(ldbObject.value)
         pool = BreakUpLargeNumbers(GetReservoirAnima())
         sum = BreakUpLargeNumbers(GetReservoirAnima() + ldbObject.value)
-    else 
+    else
         stored = ldbObject.value
         pool = GetReservoirAnima()
         sum = GetReservoirAnima() + ldbObject.value
@@ -351,29 +389,29 @@ local waitTable = {};
 local waitFrame = nil;
 
 function SAC__wait(delay, func, ...)
-  if(type(delay)~="number" or type(func)~="function") then
-    return false;
-  end
-  if(waitFrame == nil) then
-    waitFrame = CreateFrame("Frame","WaitFrame", UIParent);
-    waitFrame:SetScript("onUpdate",function (self,elapse)
-      local count = #waitTable;
-      local i = 1;
-      while(i<=count) do
-        local waitRecord = tremove(waitTable,i);
-        local d = tremove(waitRecord,1);
-        local f = tremove(waitRecord,1);
-        local p = tremove(waitRecord,1);
-        if(d>elapse) then
-          tinsert(waitTable,i,{d-elapse,f,p});
-          i = i + 1;
-        else
-          count = count - 1;
-          f(unpack(p));
-        end
-      end
-    end);
-  end
-  tinsert(waitTable,{delay,func,{...}});
-  return true;
+    if (type(delay) ~= "number" or type(func) ~= "function") then
+        return false;
+    end
+    if (waitFrame == nil) then
+        waitFrame = CreateFrame("Frame", "WaitFrame", UIParent);
+        waitFrame:SetScript("onUpdate", function(self, elapse)
+            local count = #waitTable;
+            local i = 1;
+            while (i <= count) do
+                local waitRecord = tremove(waitTable, i);
+                local d = tremove(waitRecord, 1);
+                local f = tremove(waitRecord, 1);
+                local p = tremove(waitRecord, 1);
+                if (d > elapse) then
+                    tinsert(waitTable, i, {d - elapse, f, p});
+                    i = i + 1;
+                else
+                    count = count - 1;
+                    f(unpack(p));
+                end
+            end
+        end);
+    end
+    tinsert(waitTable, {delay, func, {...}});
+    return true;
 end
