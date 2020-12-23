@@ -8,6 +8,9 @@ local AceConfig = LibStub("AceConfig-3.0")
 local AceConfigDialog = LibStub("AceConfigDialog-3.0")
 local LDB = LibStub:GetLibrary("LibDataBroker-1.1")
 
+local iconString = '|T%s:16:16:0:0:64:64:4:60:4:60|t '
+
+-- init ldbObject
 local ldbObject = LDB:NewDataObject("Stored Anima", {
     type = "data source",
     text = "-",
@@ -37,13 +40,15 @@ local configIsVerbose = false
 local configFormat = Format.stored
 local configBreakLargeNumbers = true
 local configShowLabel = true
+local configShowIcon = true
 
 local defaults = {
     profile = {
         format = Format.stored,
         verbose = false,
         breakLargeNumbers = true,
-        showLabel = true
+        showLabel = true,
+        showIcon = true
     }
 }
 
@@ -147,13 +152,21 @@ function StoredAnimaCounter:SetupConfig()
                         type = "header",
                         order = 5
                     },
+                    icon = {
+                        name = "Show icon",
+                        desc = "Show icon in front of output",
+                        type = "toggle",
+                        set = "SetShowIcon",
+                        get = "GetShowIcon",
+                        order = 6
+                    },
                     label = {
                         name = "Show label",
                         desc = "Show label in front of output",
                         type = "toggle",
                         set = "SetShowLabel",
                         get = "GetShowLabel",
-                        order = 6
+                        order = 7
                     },
                     verbose = {
                         name = "Enable chat output",
@@ -161,7 +174,7 @@ function StoredAnimaCounter:SetupConfig()
                         type = "toggle",
                         set = "SetVerbose",
                         get = "GetVerbose",
-                        order = 7
+                        order = 8
                     }
                 }
             }
@@ -178,7 +191,12 @@ function StoredAnimaCounter:RefreshConfig()
     configFormat = self.db.profile.format
     configBreakLargeNumbers = self.db.profile.breakLargeNumbers
     configShowLabel = self.db.profile.showLabel
+    configShowIcon = self.db.profile.showIcon
     StoredAnimaCounter:ScanForStoredAnima()
+end
+
+function StoredAnimaCounter:GetAnimaIcon()
+    return C_CurrencyInfo.GetCurrencyInfo(C_CovenantSanctumUI.GetAnimaInfo()).iconFileID
 end
 
 function StoredAnimaCounter:OpenConfigPanel(info)
@@ -198,7 +216,7 @@ end
 function StoredAnimaCounter:SetFormat(info, toggle)
     configFormat = toggle
     self.db.profile.format = toggle
-    StoredAnimaCounter:outputValue(ldbObject.value)
+    StoredAnimaCounter:OutputValue(ldbObject.value)
 end
 
 function StoredAnimaCounter:GetFormat(info)
@@ -208,7 +226,7 @@ end
 function StoredAnimaCounter:SetBreakLargeNumbers(info, toggle)
     configBreakLargeNumbers = toggle
     self.db.profile.breakLargeNumbers = toggle
-    StoredAnimaCounter:outputValue(ldbObject.value)
+    StoredAnimaCounter:OutputValue(ldbObject.value)
 end
 
 function StoredAnimaCounter:GetBreakLargeNumbers(info)
@@ -218,11 +236,21 @@ end
 function StoredAnimaCounter:SetShowLabel(info, toggle)
     configShowLabel = toggle
     self.db.profile.showLabel = toggle
-    StoredAnimaCounter:outputValue(ldbObject.value)
+    StoredAnimaCounter:OutputValue(ldbObject.value)
 end
 
 function StoredAnimaCounter:GetShowLabel(info)
     return configShowLabel
+end
+
+function StoredAnimaCounter:SetShowIcon(info, toggle)
+    configShowIcon = toggle
+    self.db.profile.showIcon = toggle
+    StoredAnimaCounter:OutputValue(ldbObject.value)
+end
+
+function StoredAnimaCounter:GetShowIcon(info)
+    return configShowIcon
 end
 
 -- Anima functions
@@ -240,10 +268,10 @@ function StoredAnimaCounter:ScanForStoredAnima()
             total = total + (StoredAnimaCounter:doForItemInBag(bag, slot))
         end
     end
-    StoredAnimaCounter:outputValue(total)
+    StoredAnimaCounter:OutputValue(total)
 end
 
-function StoredAnimaCounter:outputValue(storedAnima)
+function StoredAnimaCounter:OutputValue(storedAnima)
     local stored, pool, sum
 
     -- Breakdown large numbers
@@ -257,13 +285,19 @@ function StoredAnimaCounter:outputValue(storedAnima)
         sum = GetReservoirAnima() + storedAnima
     end
 
-    -- Show label
-    if configShowLabel then
-        ldbObject.text = string.format("|cFF2C94FE%s:|r ", ldbObject.label)
-    else
-        ldbObject.text = ""
+    -- Reset text
+    ldbObject.text = ""
+
+    -- Show icon
+    if configShowIcon then
+        ldbObject.text = string.format(iconString, StoredAnimaCounter:GetAnimaIcon())
     end
 
+    -- Show label
+    if configShowLabel then
+        ldbObject.text = ldbObject.text..string.format("|cFF2C94FE%s:|r ", ldbObject.label)
+    end
+ 
     -- Update values
     vprint(">> Total stored anima: " .. stored)
     ldbObject.value = stored
