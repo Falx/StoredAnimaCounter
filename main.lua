@@ -32,7 +32,6 @@ local Format = {
 local FormatLabels = {"stored_only", "stored_plus_pool", "pool_plus_stored", "sum_only", "sum_plus_stored",
                       "stored_plus_sum", "pool_plus_sum"}
 
-local tooltip = nil
 local bucketListener = nil
 local worldListener = nil
 local currListener = nil
@@ -265,7 +264,7 @@ function StoredAnimaCounter:ScanForStoredAnima()
     for bag = 0, 4 do
         local slots = GetContainerNumSlots(bag)
         for slot = 1, slots do
-            total = total + (StoredAnimaCounter:doForItemInBag(bag, slot))
+            total = total + (StoredAnimaCounter:CountAnima(bag, slot))
         end
     end
     StoredAnimaCounter:OutputValue(total)
@@ -295,9 +294,9 @@ function StoredAnimaCounter:OutputValue(storedAnima)
 
     -- Show label
     if configShowLabel then
-        ldbObject.text = ldbObject.text..string.format("|cFF2C94FE%s:|r ", ldbObject.label)
+        ldbObject.text = ldbObject.text .. string.format("|cFF2C94FE%s:|r ", ldbObject.label)
     end
- 
+
     -- Update values
     vprint(">> Total stored anima: " .. stored)
     ldbObject.value = stored
@@ -331,55 +330,43 @@ function StoredAnimaCounter:OutputValue(storedAnima)
 
 end
 
-function StoredAnimaCounter:ttCreate()
-    local tip, tipText = CreateFrame("GameTooltip"), {}
-    for i = 1, 6 do
-        local tipLeft, tipRight = tip:CreateFontString(), tip:CreateFontString()
-        tipLeft:SetFontObject(GameFontNormal)
-        tipRight:SetFontObject(GameFontNormal)
-        tip:AddFontStrings(tipLeft, tipRight)
-        tipText[i] = tipLeft
+function StoredAnimaCounter:CountAnima(bag, slot)
+    local itemId = GetContainerItemID(bag, slot)
+    local _, itemCount, _, itemQuality = GetContainerItemInfo(bag, slot)
+    local animaCount = 0
+    if itemId ~= nil and C_Item.IsAnimaItemByID(itemId) then
+        if itemQuality == 2 and itemId == 183727 then -- If warmode bonus item
+            animaCount = (itemCount or 1) * 3
+        else -- Normal item
+            animaCount = (itemCount or 1) * StoredAnimaCounter:GetAnimaForQuality(itemQuality)
+        end
+        AnimaPrint(animaCount, itemId)
     end
-    tip.tipText = tipText
-    return tip
+    return animaCount
 end
 
-function StoredAnimaCounter:doForItemInBag(bag, slot)
-    local itemId = GetContainerItemID(bag, slot)
-    local _, itemCount = GetContainerItemInfo(bag, slot)
-    local totalAnima = 0
-    if itemId ~= nil then
-        local itemLink = select(2, GetItemInfo(itemId))
-        tooltip = tooltip or StoredAnimaCounter:ttCreate()
-        tooltip:SetOwner(UIParent, "ANCHOR_NONE")
-        tooltip:ClearLines()
-        tooltip:SetBagItem(bag, slot)
-
-        if C_Item.IsAnimaItemByID(itemId) then
-            local animaCount = 0;
-            for j = 2, #tooltip.tipText do
-                local t = tooltip.tipText[j]:GetText()
-                -- Anima isn't matching the tooltip text properly, so have to search on substring
-                if t and t:find("^" .. ITEM_SPELL_TRIGGER_ONUSE) then
-                    local num = t:match("%d+")
-                    animaCount = tonumber(num or "")
-                    break
-                end
-            end
-
-            if (animaCount > 0) then
-                totalAnima = (itemCount or 1) * animaCount
-                vprint("Anima present: " .. totalAnima .. " on " .. itemLink)
-            end
-        end
-        tooltip:Hide()
+function StoredAnimaCounter:GetAnimaForQuality(quality)
+    if quality == 4 then -- Epic
+        return 250
+    elseif quality == 3 then -- Rare
+        return 35
+    elseif quality == 2 then -- Uncommon
+        return 5
+    else -- Everything else
+        return 0
     end
-    return totalAnima
 end
 
 function vprint(val)
     if configIsVerbose then
         print(val)
+    end
+end
+
+function AnimaPrint(val, itemId)
+    if configIsVerbose then
+        local itemLink = select(2, GetItemInfo(itemId))
+        print("Anima present: " .. val .. " on " .. itemLink)
     end
 end
 
