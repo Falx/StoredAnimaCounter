@@ -25,12 +25,13 @@ local Format = {
     sum_only = 4,
     sum_plus_stored = 5,
     stored_plus_sum = 6,
-    pool_plus_sum = 7
+    pool_plus_sum = 7,
+    custom_format = 8
 
 }
 
 local FormatLabels = {"stored_only", "stored_plus_pool", "pool_plus_stored", "sum_only", "sum_plus_stored",
-                      "stored_plus_sum", "pool_plus_sum"}
+                      "stored_plus_sum", "pool_plus_sum", "custom_format"}
 
 local bucketListener = nil
 local worldListener = nil
@@ -40,6 +41,7 @@ local configFormat = Format.stored
 local configBreakLargeNumbers = true
 local configShowLabel = true
 local configShowIcon = true
+local configCustomFormat = "${stored}+${pool}=${sum}"
 
 local defaults = {
     profile = {
@@ -47,7 +49,8 @@ local defaults = {
         verbose = false,
         breakLargeNumbers = true,
         showLabel = true,
-        showIcon = true
+        showIcon = true,
+        customFormat = "${stored}+${pool}=${sum}"
     }
 }
 
@@ -138,18 +141,33 @@ function StoredAnimaCounter:SetupConfig()
                         type = "description",
                         order = 3
                     },
+                    customFormat = {
+                        name = "Custom format",
+                        desc = "Create your own custom format string for the output",
+                        type = "input",
+                        set = "SetCustomFormat",
+                        get = "GetCustomFormat",
+                        width = "full",
+                        order = 4
+                    },
+                    customFormatDesc = {
+                        name = "\nCreate your own custom format using one of the interpolated variables: ${stored}, ${pool}, ${sum}.\nThese variables will get replaced, all other characters remain untouched.",
+                        type = "description",
+                        order = 5
+                    },
+                    headerVerbose = {
+                        name = "Extra toggles",
+                        type = "header",
+                        order = 6
+                    },
                     largeNumbers = {
                         name = "Break down large numbers",
                         desc = "Type large number using separators",
                         type = "toggle",
                         set = "SetBreakLargeNumbers",
                         get = "GetBreakLargeNumbers",
-                        order = 4
-                    },
-                    headerVerbose = {
-                        name = "Extra toggles",
-                        type = "header",
-                        order = 5
+                        width = "full",
+                        order = 7
                     },
                     icon = {
                         name = "Show icon",
@@ -157,7 +175,8 @@ function StoredAnimaCounter:SetupConfig()
                         type = "toggle",
                         set = "SetShowIcon",
                         get = "GetShowIcon",
-                        order = 6
+                        width = "full",
+                        order = 8
                     },
                     label = {
                         name = "Show label",
@@ -165,7 +184,8 @@ function StoredAnimaCounter:SetupConfig()
                         type = "toggle",
                         set = "SetShowLabel",
                         get = "GetShowLabel",
-                        order = 7
+                        width = "full",
+                        order = 9
                     },
                     verbose = {
                         name = "Enable chat output",
@@ -173,7 +193,8 @@ function StoredAnimaCounter:SetupConfig()
                         type = "toggle",
                         set = "SetVerbose",
                         get = "GetVerbose",
-                        order = 8
+                        width = "full",
+                        order = 10
                     }
                 }
             }
@@ -191,6 +212,7 @@ function StoredAnimaCounter:RefreshConfig()
     configBreakLargeNumbers = self.db.profile.breakLargeNumbers
     configShowLabel = self.db.profile.showLabel
     configShowIcon = self.db.profile.showIcon
+    configCustomFormat = self.db.profile.customFormat
     StoredAnimaCounter:ScanForStoredAnima()
 end
 
@@ -250,6 +272,16 @@ end
 
 function StoredAnimaCounter:GetShowIcon(info)
     return configShowIcon
+end
+
+function StoredAnimaCounter:SetCustomFormat(info, input)
+    configCustomFormat = input
+    self.db.profile.customFormat = input
+    StoredAnimaCounter:OutputValue(ldbObject.value)
+end
+
+function StoredAnimaCounter:GetCustomFormat(info)
+    return configCustomFormat
 end
 
 -- Anima functions
@@ -314,6 +346,11 @@ function StoredAnimaCounter:OutputValue(storedAnima)
         ldbObject.text = ldbObject.text .. string.format("%s (%s)", stored, sum)
     elseif configFormat == Format.pool_plus_sum then
         ldbObject.text = ldbObject.text .. string.format("%s (%s)", pool, sum)
+    elseif configFormat == Format.custom_format then
+        local txt = string.gsub(configCustomFormat, "${stored}", stored)
+        txt = string.gsub(txt, "${pool}", pool)
+        txt = string.gsub(txt, "${sum}", sum)
+        ldbObject.text = ldbObject.text .. txt
     end
 
     -- Hack for controlling label display settings in ElvUI (which shows by default on strlen < 3)
