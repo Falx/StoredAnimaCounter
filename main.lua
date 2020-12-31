@@ -331,7 +331,7 @@ function StoredAnimaCounter:OutputValue(storedAnima)
 
     -- Update values
     vprint(">> Total stored anima: " .. stored)
-    ldbObject.value = stored
+    ldbObject.value = storedAnima
     if configFormat == Format.stored then
         ldbObject.text = ldbObject.text .. string.format("%s", stored)
     elseif configFormat == Format.stored_plus_pool then
