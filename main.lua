@@ -15,7 +15,7 @@ local ldbObject = LDB:NewDataObject("Stored Anima", {
     type = "data source",
     text = "-",
     value = 0,
-    label = "Anima"
+    label = "Stored Anima"
 })
 
 local Format = {
