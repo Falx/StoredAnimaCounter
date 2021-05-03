@@ -42,6 +42,9 @@ local configBreakLargeNumbers = true
 local configShowLabel = true
 local configShowIcon = true
 local configCustomFormat = "${stored}+${pool}=${sum}"
+local configTTBaggedAnima = true;
+local configTTReservoirAnima = true;
+local configTTTotalAnima = true;
 
 local defaults = {
     profile = {
@@ -50,10 +53,45 @@ local defaults = {
         breakLargeNumbers = true,
         showLabel = true,
         showIcon = true,
-        customFormat = "${stored}+${pool}=${sum}"
+        customFormat = "${stored}+${pool}=${sum}",
+        TTBaggedAnima = true,
+        TTReservoirAnima = true,
+        TTTotalAnima = true
     }
 }
 
+-- Hooks
+
+function StoredAnimaCounter:SetUpHooks()
+    if (configTTBaggedAnima or configTTReservoirAnima or configTTTotalAnima) then
+        GameTooltip:HookScript("OnTooltipSetItem", function(self)
+            local item, link = GameTooltip:GetItem()
+            if C_Item.IsAnimaItemByID(link) then
+                local stored, pool, sum
+                if configBreakLargeNumbers then
+                    stored = BreakUpLargeNumbers(ldbObject.value)
+                    pool = BreakUpLargeNumbers(GetReservoirAnima())
+                    sum = BreakUpLargeNumbers(GetReservoirAnima() + ldbObject.value)
+                else
+                    stored = ldbObject.value
+                    pool = GetReservoirAnima()
+                    sum = GetReservoirAnima() + ldbObject.value
+                end
+
+                self:AddLine("\n")
+                if configTTBaggedAnima then
+                    self:AddDoubleLine("|cFF2C94FEAnima (bag):", "|cFFFFFFFF" .. stored .. "|r")
+                end
+                if configTTReservoirAnima then
+                    self:AddDoubleLine("|cFF2C94FEAnima (reservoir):", "|cFFFFFFFF" .. pool .. "|r")
+                end
+                if configTTTotalAnima then
+                    self:AddDoubleLine("|cFF2C94FEAnima (total):", "|cFFFFFFFF" .. sum .. "|r")
+                end
+            end
+        end)
+    end
+end
 -- Lifecycle functions
 
 function StoredAnimaCounter:OnInitialize()
@@ -76,7 +114,10 @@ function StoredAnimaCounter:OnEnable()
     end
 
     StoredAnimaCounter:RefreshConfig()
+
+    
 end
+
 
 function StoredAnimaCounter:OnDisable()
     if worldListener then
@@ -197,6 +238,45 @@ function StoredAnimaCounter:SetupConfig()
                         order = 10
                     }
                 }
+            },
+            tooltip = {
+                name = "Tooltip",
+                type = "group",
+                handler = StoredAnimaCounter,
+                args = {
+                    tooltipDesc = {
+                        name = "\nToggle info to show on anima item tooltips",
+                        type = "description",
+                        order = 1
+                    },
+                    baggedAnimaToggle = {
+                        name = "Show bagged anima",
+                        desc = "Show total anima currently in your bags",
+                        type = "toggle",
+                        set = "SetTTBaggedAnima",
+                        get = "GetTTBaggedAnima",
+                        width = "full",
+                        order = 2
+                    },
+                    reservoirAnimaToggle = {
+                        name = "Show reservoir anima",
+                        desc = "Show amount of anima in your covenant's reservoir",
+                        type = "toggle",
+                        set = "SetTTReservoirAnima",
+                        get = "GetTTReservoirAnima",
+                        width = "full",
+                        order = 3
+                    },
+                    totalAnimaToggle = {
+                        name = "Show total anima",
+                        desc = "Show total of bagged and anima in your covenant's reservoir",
+                        type = "toggle",
+                        set = "SetTTTotalAnima",
+                        get = "GetTTTotalAnima",
+                        width = "full",
+                        order = 3
+                    }
+                }
             }
         }
     }
@@ -213,6 +293,7 @@ function StoredAnimaCounter:RefreshConfig()
     configShowLabel = self.db.profile.showLabel
     configShowIcon = self.db.profile.showIcon
     configCustomFormat = self.db.profile.customFormat
+    StoredAnimaCounter:SetUpHooks()
     StoredAnimaCounter:ScanForStoredAnima()
 end
 
@@ -272,6 +353,39 @@ end
 
 function StoredAnimaCounter:GetShowIcon(info)
     return configShowIcon
+end
+
+
+function StoredAnimaCounter:SetTTBaggedAnima(info, toggle)
+    configTTBaggedAnima = toggle
+    self.db.profile.TTBaggedAnima = toggle
+    StoredAnimaCounter:OutputValue(ldbObject.value)
+end
+
+function StoredAnimaCounter:GetTTBaggedAnima(info)
+    return configTTBaggedAnima
+end
+
+
+function StoredAnimaCounter:SetTTReservoirAnima(info, toggle)
+    configTTReservoirAnima = toggle
+    self.db.profile.TTReservoirAnima = toggle
+    StoredAnimaCounter:OutputValue(ldbObject.value)
+end
+
+function StoredAnimaCounter:GetTTReservoirAnima(info)
+    return configTTReservoirAnima
+end
+
+
+function StoredAnimaCounter:SetTTTotalAnima(info, toggle)
+    configTTTotalAnima = toggle
+    self.db.profile.TTTotalAnima = toggle
+    StoredAnimaCounter:OutputValue(ldbObject.value)
+end
+
+function StoredAnimaCounter:GetTTTotalAnima(info)
+    return configTTTotalAnima
 end
 
 function StoredAnimaCounter:SetCustomFormat(info, input)
