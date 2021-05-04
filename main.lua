@@ -63,8 +63,8 @@ local defaults = {
 -- Hooks
 
 function StoredAnimaCounter:SetUpHooks()
-    if (configTTBaggedAnima or configTTReservoirAnima or configTTTotalAnima) then
-        GameTooltip:HookScript("OnTooltipSetItem", function(self)
+    GameTooltip:HookScript("OnTooltipSetItem", function(self)
+        if (configTTBaggedAnima or configTTReservoirAnima or configTTTotalAnima) then
             local item, link = GameTooltip:GetItem()
             if C_Item.IsAnimaItemByID(link) then
                 local stored, pool, sum
@@ -78,7 +78,9 @@ function StoredAnimaCounter:SetUpHooks()
                     sum = GetReservoirAnima() + ldbObject.value
                 end
 
-                self:AddLine("\n")
+                if (configTTBaggedAnima or configTTReservoirAnima or configTTTotalAnima) then
+                    self:AddLine("\n")
+                end
                 if configTTBaggedAnima then
                     self:AddDoubleLine("|cFF2C94FEAnima (bag):", "|cFFFFFFFF" .. stored .. "|r")
                 end
@@ -89,8 +91,8 @@ function StoredAnimaCounter:SetUpHooks()
                     self:AddDoubleLine("|cFF2C94FEAnima (total):", "|cFFFFFFFF" .. sum .. "|r")
                 end
             end
-        end)
-    end
+        end
+    end)
 end
 -- Lifecycle functions
 
