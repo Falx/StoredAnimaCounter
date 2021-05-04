@@ -293,6 +293,9 @@ function StoredAnimaCounter:RefreshConfig()
     configShowLabel = self.db.profile.showLabel
     configShowIcon = self.db.profile.showIcon
     configCustomFormat = self.db.profile.customFormat
+    configTTBaggedAnima = self.db.profile.TTBaggedAnima
+    configTTReservoirAnima = self.db.profile.TTReservoirAnima
+    configTTTotalAnima = self.db.profile.TTTotalAnima
     StoredAnimaCounter:SetUpHooks()
     StoredAnimaCounter:ScanForStoredAnima()
 end
