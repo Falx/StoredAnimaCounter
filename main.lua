@@ -15,6 +15,7 @@ local ldbObject = LDB:NewDataObject("Stored Anima", {
     type = "data source",
     text = "-",
     value = 0,
+    icon = "Interface\\Icons\\spell_animabastion_orb",
     label = "Stored Anima"
 })
 
@@ -42,9 +43,9 @@ local configBreakLargeNumbers = true
 local configShowLabel = true
 local configShowIcon = true
 local configCustomFormat = "${stored}+${pool}=${sum}"
-local configTTBaggedAnima = true;
-local configTTReservoirAnima = true;
-local configTTTotalAnima = true;
+local configTTBaggedAnima = true
+local configTTReservoirAnima = true
+local configTTTotalAnima = true
 
 local defaults = {
     profile = {
@@ -213,13 +214,13 @@ function StoredAnimaCounter:SetupConfig()
                         order = 7
                     },
                     icon = {
-                        name = "Show icon",
-                        desc = "Show icon in front of output",
+                        name = "Show icon in text",
+                        desc = "Show icon in the value text (workaround for eg. ElvUI Datatexts)",
                         type = "toggle",
                         set = "SetShowIcon",
                         get = "GetShowIcon",
                         width = "full",
-                        order = 8
+                        order = 9
                     },
                     label = {
                         name = "Show label",
@@ -228,7 +229,7 @@ function StoredAnimaCounter:SetupConfig()
                         set = "SetShowLabel",
                         get = "GetShowLabel",
                         width = "full",
-                        order = 9
+                        order = 10
                     },
                     verbose = {
                         name = "Enable chat output",
@@ -237,7 +238,7 @@ function StoredAnimaCounter:SetupConfig()
                         set = "SetVerbose",
                         get = "GetVerbose",
                         width = "full",
-                        order = 10
+                        order = 11
                     }
                 }
             },
@@ -360,7 +361,6 @@ function StoredAnimaCounter:GetShowIcon(info)
     return configShowIcon
 end
 
-
 function StoredAnimaCounter:SetTTBaggedAnima(info, toggle)
     configTTBaggedAnima = toggle
     self.db.profile.TTBaggedAnima = toggle
@@ -438,7 +438,7 @@ function StoredAnimaCounter:OutputValue(storedAnima)
     -- Reset text
     ldbObject.text = ""
 
-    -- Show icon
+    -- Show icon in label
     if configShowIcon then
         ldbObject.text = string.format(iconString, StoredAnimaCounter:GetAnimaIcon())
     end
