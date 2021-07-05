@@ -67,7 +67,7 @@ function StoredAnimaCounter:SetUpHooks()
     GameTooltip:HookScript("OnTooltipSetItem", function(self)
         if (configTTBaggedAnima or configTTReservoirAnima or configTTTotalAnima) then
             local item, link = GameTooltip:GetItem()
-            if C_Item.IsAnimaItemByID(link) then
+            if link ~= nil and C_Item.IsAnimaItemByID(link) then
                 local stored, pool, sum
                 if configBreakLargeNumbers then
                     stored = BreakUpLargeNumbers(ldbObject.value)
