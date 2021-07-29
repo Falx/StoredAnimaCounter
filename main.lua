@@ -31,9 +31,13 @@ local Format = {
 
 }
 
+local baggedAnima = 0
+local bankedAnima = 0
+
 local FormatLabels = {"stored_only", "stored_plus_pool", "pool_plus_stored", "sum_only", "sum_plus_stored",
                       "stored_plus_sum", "pool_plus_sum", "custom_format"}
 
+local bankListener = nil
 local bucketListener = nil
 local worldListener = nil
 local currListener = nil
@@ -46,6 +50,7 @@ local configCustomFormat = "${stored}+${pool}=${sum}"
 local configTTBaggedAnima = true
 local configTTReservoirAnima = true
 local configTTTotalAnima = true
+local configCountBankedAnima = true
 
 local defaults = {
     profile = {
@@ -57,7 +62,9 @@ local defaults = {
         customFormat = "${stored}+${pool}=${sum}",
         TTBaggedAnima = true,
         TTReservoirAnima = true,
-        TTTotalAnima = true
+        TTTotalAnima = true,
+        countBankedAnima = true,
+        bankedAnima = 0
     }
 }
 
@@ -70,20 +77,20 @@ function StoredAnimaCounter:SetUpHooks()
             if link ~= nil and C_Item.IsAnimaItemByID(link) then
                 local stored, pool, sum
                 if configBreakLargeNumbers then
-                    stored = BreakUpLargeNumbers(ldbObject.value)
+                    stored = BreakUpLargeNumbers(StoredAnimaCounter:GetStoredAnima())
                     pool = BreakUpLargeNumbers(GetReservoirAnima())
-                    sum = BreakUpLargeNumbers(GetReservoirAnima() + ldbObject.value)
+                    sum = BreakUpLargeNumbers(GetReservoirAnima() + StoredAnimaCounter:GetStoredAnima())
                 else
                     stored = ldbObject.value
                     pool = GetReservoirAnima()
-                    sum = GetReservoirAnima() + ldbObject.value
+                    sum = GetReservoirAnima() + StoredAnimaCounter:GetStoredAnima()
                 end
 
                 if (configTTBaggedAnima or configTTReservoirAnima or configTTTotalAnima) then
                     self:AddLine("\n")
                 end
                 if configTTBaggedAnima then
-                    self:AddDoubleLine("|cFF2C94FEAnima (bag):", "|cFFFFFFFF" .. stored .. "|r")
+                    self:AddDoubleLine("|cFF2C94FEAnima (bag):", "|cFFFFFFFF" .. StoredAnimaCounter:GetStoredAnima() .. "|r")
                 end
                 if configTTReservoirAnima then
                     self:AddDoubleLine("|cFF2C94FEAnima (reservoir):", "|cFFFFFFFF" .. pool .. "|r")
@@ -113,12 +120,27 @@ function StoredAnimaCounter:OnEnable()
     end
 
     if bucketListener == nil then
-        bucketListener = self:RegisterBucketEvent("BAG_UPDATE", 0.2, "ScanForStoredAnima")
+        bucketListener = self:RegisterBucketEvent("BAG_UPDATE", 0.2, "ScanChange")
+    end
+
+    if bankListener == nil then
+        bankListener = self:RegisterBucketEvent("BANKFRAME_OPENED", 0.2, "ScanBankForStoredAnima")
     end
 
     StoredAnimaCounter:RefreshConfig()
+end
 
-    
+function StoredAnimaCounter:ScanChange(events)
+    for bagId,_ in pairs(events) do 
+        if (bagId == -1 or (bagId > NUM_BAG_SLOTS and bagId <= NUM_BAG_SLOTS+NUM_BANKBAGSLOTS)) then
+            StoredAnimaCounter:ScanBankForStoredAnima()
+        elseif (bagId >= 0 and bagId <= NUM_BAG_SLOTS) then
+            StoredAnimaCounter:ScanForStoredAnima()
+        else
+            StoredAnimaCounter:ScanBankForStoredAnima()
+            StoredAnimaCounter:ScanForStoredAnima()
+        end
+    end
 end
 
 
@@ -136,6 +158,11 @@ function StoredAnimaCounter:OnDisable()
     if bucketListener then
         self:UnregisterBucket(bucketListener)
         bucketListener = nil
+    end
+
+    if bankListener then
+        self:UnregisterBucket(bankListener)
+        bankListener = nil
     end
 end
 
@@ -195,7 +222,7 @@ function StoredAnimaCounter:SetupConfig()
                         order = 4
                     },
                     customFormatDesc = {
-                        name = "\nCreate your own custom format using one of the interpolated variables: ${stored}, ${pool}, ${sum}.\nThese variables will get replaced, all other characters remain untouched.",
+                        name = "\nCreate your own custom format using some of the interpolated variables: \n${stored} - All stored anima (in bags and depending on config in bank too).\n${pool} - All pooled anima (deposited in your covenant's reservoir).\n${sum} - The total of ${stored} and ${pool}.\n${bagged} - Only stored anima from your player bags.\n${banked} - Only stored anima from your bank.\nThese variables will get replaced, all other characters remain untouched.",
                         type = "description",
                         order = 5
                     },
@@ -212,6 +239,15 @@ function StoredAnimaCounter:SetupConfig()
                         get = "GetBreakLargeNumbers",
                         width = "full",
                         order = 7
+                    },
+                    countBankedAnima = {
+                        name = "Count banked anima",
+                        desc = "Also count anima stored in bank as stored (open Bank at least once)",
+                        type = "toggle",
+                        set = "SetCountBankedAnima",
+                        get = "GetCountBankedAnima",
+                        width = "full",
+                        order = 8
                     },
                     icon = {
                         name = "Show icon in text",
@@ -299,6 +335,8 @@ function StoredAnimaCounter:RefreshConfig()
     configTTBaggedAnima = self.db.profile.TTBaggedAnima
     configTTReservoirAnima = self.db.profile.TTReservoirAnima
     configTTTotalAnima = self.db.profile.TTTotalAnima
+    configCountBankedAnima = self.db.profile.countBankedAnima
+    bankedAnima = self.db.profile.bankedAnima or 0
     StoredAnimaCounter:SetUpHooks()
     StoredAnimaCounter:ScanForStoredAnima()
 end
@@ -324,7 +362,7 @@ end
 function StoredAnimaCounter:SetFormat(info, toggle)
     configFormat = toggle
     self.db.profile.format = toggle
-    StoredAnimaCounter:OutputValue(ldbObject.value)
+    StoredAnimaCounter:OutputValue()
 end
 
 function StoredAnimaCounter:GetFormat(info)
@@ -334,17 +372,27 @@ end
 function StoredAnimaCounter:SetBreakLargeNumbers(info, toggle)
     configBreakLargeNumbers = toggle
     self.db.profile.breakLargeNumbers = toggle
-    StoredAnimaCounter:OutputValue(ldbObject.value)
+    StoredAnimaCounter:OutputValue()
 end
 
 function StoredAnimaCounter:GetBreakLargeNumbers(info)
     return configBreakLargeNumbers
 end
 
+function StoredAnimaCounter:SetCountBankedAnima(info, toggle)
+    configCountBankedAnima = toggle
+    self.db.profile.configCountBankedAnima = toggle
+    StoredAnimaCounter:OutputValue()
+end
+
+function StoredAnimaCounter:GetCountBankedAnima(info)
+    return configCountBankedAnima
+end
+
 function StoredAnimaCounter:SetShowLabel(info, toggle)
     configShowLabel = toggle
     self.db.profile.showLabel = toggle
-    StoredAnimaCounter:OutputValue(ldbObject.value)
+    StoredAnimaCounter:OutputValue()
 end
 
 function StoredAnimaCounter:GetShowLabel(info)
@@ -354,7 +402,7 @@ end
 function StoredAnimaCounter:SetShowIcon(info, toggle)
     configShowIcon = toggle
     self.db.profile.showIcon = toggle
-    StoredAnimaCounter:OutputValue(ldbObject.value)
+    StoredAnimaCounter:OutputValue()
 end
 
 function StoredAnimaCounter:GetShowIcon(info)
@@ -364,7 +412,7 @@ end
 function StoredAnimaCounter:SetTTBaggedAnima(info, toggle)
     configTTBaggedAnima = toggle
     self.db.profile.TTBaggedAnima = toggle
-    StoredAnimaCounter:OutputValue(ldbObject.value)
+    StoredAnimaCounter:OutputValue()
 end
 
 function StoredAnimaCounter:GetTTBaggedAnima(info)
@@ -375,7 +423,7 @@ end
 function StoredAnimaCounter:SetTTReservoirAnima(info, toggle)
     configTTReservoirAnima = toggle
     self.db.profile.TTReservoirAnima = toggle
-    StoredAnimaCounter:OutputValue(ldbObject.value)
+    StoredAnimaCounter:OutputValue()
 end
 
 function StoredAnimaCounter:GetTTReservoirAnima(info)
@@ -386,7 +434,7 @@ end
 function StoredAnimaCounter:SetTTTotalAnima(info, toggle)
     configTTTotalAnima = toggle
     self.db.profile.TTTotalAnima = toggle
-    StoredAnimaCounter:OutputValue(ldbObject.value)
+    StoredAnimaCounter:OutputValue()
 end
 
 function StoredAnimaCounter:GetTTTotalAnima(info)
@@ -396,7 +444,7 @@ end
 function StoredAnimaCounter:SetCustomFormat(info, input)
     configCustomFormat = input
     self.db.profile.customFormat = input
-    StoredAnimaCounter:OutputValue(ldbObject.value)
+    StoredAnimaCounter:OutputValue()
 end
 
 function StoredAnimaCounter:GetCustomFormat(info)
@@ -410,29 +458,58 @@ function StoredAnimaCounter:ScanForStoredAnimaDelayed()
 end
 
 function StoredAnimaCounter:ScanForStoredAnima()
-    vprint("Scanning:")
+    vprint("Scanning bags:")
     local total = 0
-    for bag = 0, 4 do
+    -- for bag = 0, 4 do
+    for bag = BACKPACK_CONTAINER, NUM_BAG_SLOTS do
         local slots = GetContainerNumSlots(bag)
         for slot = 1, slots do
             total = total + (StoredAnimaCounter:CountAnima(bag, slot))
         end
     end
-    StoredAnimaCounter:OutputValue(total)
+    baggedAnima = total
+    StoredAnimaCounter:OutputValue()
 end
 
-function StoredAnimaCounter:OutputValue(storedAnima)
-    local stored, pool, sum
+function StoredAnimaCounter:ScanBankForStoredAnima()
+    vprint("Scanning bank:")
+    local total = 0
+    -- Bank base container first
+    local slots = GetContainerNumSlots(BANK_CONTAINER)
+    for slot = 1, slots do
+        total = total + (StoredAnimaCounter:CountAnima(BANK_CONTAINER, slot))
+    end
+    -- Other bank bags
+    for bag = (NUM_BAG_SLOTS + 1), (NUM_BAG_SLOTS+NUM_BANKBAGSLOTS) do
+        local slots = GetContainerNumSlots(bag)
+        for slot = 1, slots do
+            total = total + (StoredAnimaCounter:CountAnima(bag, slot))
+        end
+    end
+
+    bankedAnima = total or 0
+    -- Store banked anima in DB
+    self.db.profile.bankedAnima = total or 0
+
+    StoredAnimaCounter:OutputValue()
+end
+
+function StoredAnimaCounter:OutputValue()
+    local stored, pool, sum, bagged, banked
 
     -- Breakdown large numbers
     if configBreakLargeNumbers then
-        stored = BreakUpLargeNumbers(storedAnima)
+        stored = BreakUpLargeNumbers(StoredAnimaCounter:GetStoredAnima())
         pool = BreakUpLargeNumbers(GetReservoirAnima())
-        sum = BreakUpLargeNumbers(GetReservoirAnima() + storedAnima)
+        sum = BreakUpLargeNumbers(GetReservoirAnima() + StoredAnimaCounter:GetStoredAnima())
+        bagged = BreakUpLargeNumbers(baggedAnima)
+        banked = BreakUpLargeNumbers(bankedAnima)
     else
-        stored = storedAnima
+        stored = StoredAnimaCounter:GetStoredAnima()
         pool = GetReservoirAnima()
-        sum = GetReservoirAnima() + storedAnima
+        sum = GetReservoirAnima() + StoredAnimaCounter:GetStoredAnima()
+        bagged = baggedAnima
+        banked = bankedAnima
     end
 
     -- Reset text
@@ -450,7 +527,7 @@ function StoredAnimaCounter:OutputValue(storedAnima)
 
     -- Update values
     vprint(">> Total stored anima: " .. stored)
-    ldbObject.value = storedAnima
+    ldbObject.value = StoredAnimaCounter:GetStoredAnima()
     if configFormat == Format.stored then
         ldbObject.text = ldbObject.text .. string.format("%s", stored)
     elseif configFormat == Format.stored_plus_pool then
@@ -469,6 +546,8 @@ function StoredAnimaCounter:OutputValue(storedAnima)
         local txt = string.gsub(configCustomFormat, "${stored}", stored)
         txt = string.gsub(txt, "${pool}", pool)
         txt = string.gsub(txt, "${sum}", sum)
+        txt = string.gsub(txt, "${bagged}", bagged)
+        txt = string.gsub(txt, "${banked}", banked)
         ldbObject.text = ldbObject.text .. txt
     end
 
@@ -488,9 +567,9 @@ end
 
 function StoredAnimaCounter:CountAnima(bag, slot)
     local itemId = GetContainerItemID(bag, slot)
-    local _, itemCount, _, itemQuality = GetContainerItemInfo(bag, slot)
     local animaCount = 0
     if itemId ~= nil and C_Item.IsAnimaItemByID(itemId) then
+        local _, itemCount, _, itemQuality = GetContainerItemInfo(bag, slot)
         if itemQuality == 2 and itemId == 183727 then -- If warmode bonus item
             animaCount = (itemCount or 1) * 3
         else -- Normal item
@@ -501,6 +580,7 @@ function StoredAnimaCounter:CountAnima(bag, slot)
     return animaCount
 end
 
+
 function StoredAnimaCounter:GetAnimaForQuality(quality)
     if quality == 4 then -- Epic
         return 250
@@ -510,6 +590,14 @@ function StoredAnimaCounter:GetAnimaForQuality(quality)
         return 5
     else -- Everything else
         return 0
+    end
+end
+
+function StoredAnimaCounter:GetStoredAnima()
+    if (StoredAnimaCounter:GetCountBankedAnima()) then
+        return baggedAnima + bankedAnima
+    else
+        return baggedAnima
     end
 end
 
@@ -536,13 +624,13 @@ local NORMAL_FONT_COLOR = {1.0, 0.82, 0.0}
 function ldbObject:OnTooltipShow()
     local stored, pool, sum
     if configBreakLargeNumbers then
-        stored = BreakUpLargeNumbers(ldbObject.value)
+        stored = BreakUpLargeNumbers(StoredAnimaCounter:GetStoredAnima())
         pool = BreakUpLargeNumbers(GetReservoirAnima())
-        sum = BreakUpLargeNumbers(GetReservoirAnima() + ldbObject.value)
+        sum = BreakUpLargeNumbers(GetReservoirAnima() + StoredAnimaCounter:GetStoredAnima())
     else
-        stored = ldbObject.value
+        stored = StoredAnimaCounter:GetStoredAnima()
         pool = GetReservoirAnima()
-        sum = GetReservoirAnima() + ldbObject.value
+        sum = GetReservoirAnima() + StoredAnimaCounter:GetStoredAnima()
     end
 
     self:AddLine("|cFF2C94FEStored Anima|r")
