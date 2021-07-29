@@ -47,9 +47,11 @@ local configBreakLargeNumbers = true
 local configShowLabel = true
 local configShowIcon = true
 local configCustomFormat = "${stored}+${pool}=${sum}"
+local configTTStoredAnima = true
 local configTTBaggedAnima = true
 local configTTReservoirAnima = true
 local configTTTotalAnima = true
+local configTTBankedAnima = true
 local configCountBankedAnima = true
 
 local defaults = {
@@ -60,9 +62,11 @@ local defaults = {
         showLabel = true,
         showIcon = true,
         customFormat = "${stored}+${pool}=${sum}",
+        TTStoredAnima = true,
         TTBaggedAnima = true,
         TTReservoirAnima = true,
         TTTotalAnima = true,
+        TTBankedAnima = true,
         countBankedAnima = true,
         bankedAnima = 0
     }
@@ -75,22 +79,32 @@ function StoredAnimaCounter:SetUpHooks()
         if (configTTBaggedAnima or configTTReservoirAnima or configTTTotalAnima) then
             local item, link = GameTooltip:GetItem()
             if link ~= nil and C_Item.IsAnimaItemByID(link) then
-                local stored, pool, sum
+                local stored, pool, sum, banked, bagged
                 if configBreakLargeNumbers then
                     stored = BreakUpLargeNumbers(StoredAnimaCounter:GetStoredAnima())
                     pool = BreakUpLargeNumbers(GetReservoirAnima())
                     sum = BreakUpLargeNumbers(GetReservoirAnima() + StoredAnimaCounter:GetStoredAnima())
+                    bagged = BreakUpLargeNumbers(baggedAnima)
+                    banked = BreakUpLargeNumbers(bankedAnima)
                 else
                     stored = ldbObject.value
                     pool = GetReservoirAnima()
                     sum = GetReservoirAnima() + StoredAnimaCounter:GetStoredAnima()
+                    bagged = baggedAnima
+                    banked = bankedAnima
                 end
 
-                if (configTTBaggedAnima or configTTReservoirAnima or configTTTotalAnima) then
+                if (configTTStoredAnima or configTTBaggedAnima or configTTReservoirAnima or configTTTotalAnima or configTTBankedAnima) then
                     self:AddLine("\n")
                 end
                 if configTTBaggedAnima then
-                    self:AddDoubleLine("|cFF2C94FEAnima (bag):", "|cFFFFFFFF" .. StoredAnimaCounter:GetStoredAnima() .. "|r")
+                    self:AddDoubleLine("|cFF2C94FEAnima (bag):", "|cFFFFFFFF" .. bagged .. "|r")
+                end
+                if configTTBankedAnima then
+                    self:AddDoubleLine("|cFF2C94FEAnima (bank):", "|cFFFFFFFF" .. banked .. "|r")
+                end
+                if configTTStoredAnima then
+                    self:AddDoubleLine("|cFF2C94FEAnima (stored):", "|cFFFFFFFF" .. stored .. "|r")
                 end
                 if configTTReservoirAnima then
                     self:AddDoubleLine("|cFF2C94FEAnima (reservoir):", "|cFFFFFFFF" .. pool .. "|r")
@@ -297,6 +311,24 @@ function StoredAnimaCounter:SetupConfig()
                         width = "full",
                         order = 2
                     },
+                    bankedAnimaToggle = {
+                        name = "Show banked anima",
+                        desc = "Show total anima currently stored in your bank",
+                        type = "toggle",
+                        set = "SetTTBankedAnima",
+                        get = "GetTTBankedAnima",
+                        width = "full",
+                        order = 3
+                    },
+                    storedAnimaToggle = {
+                        name = "Show stored anima",
+                        desc = "Show total anima currently stored in your bags and your bank (if configured to be counted)",
+                        type = "toggle",
+                        set = "SetTTStoredAnima",
+                        get = "GetTTStoredAnima",
+                        width = "full",
+                        order = 4
+                    },
                     reservoirAnimaToggle = {
                         name = "Show reservoir anima",
                         desc = "Show amount of anima in your covenant's reservoir",
@@ -304,7 +336,7 @@ function StoredAnimaCounter:SetupConfig()
                         set = "SetTTReservoirAnima",
                         get = "GetTTReservoirAnima",
                         width = "full",
-                        order = 3
+                        order = 5
                     },
                     totalAnimaToggle = {
                         name = "Show total anima",
@@ -313,7 +345,7 @@ function StoredAnimaCounter:SetupConfig()
                         set = "SetTTTotalAnima",
                         get = "GetTTTotalAnima",
                         width = "full",
-                        order = 3
+                        order = 6
                     }
                 }
             }
@@ -333,6 +365,8 @@ function StoredAnimaCounter:RefreshConfig()
     configShowIcon = self.db.profile.showIcon
     configCustomFormat = self.db.profile.customFormat
     configTTBaggedAnima = self.db.profile.TTBaggedAnima
+    configTTBankedAnima = self.db.profile.TTBankedAnima
+    configTTStoredAnima = self.db.profile.TTStoredAnima
     configTTReservoirAnima = self.db.profile.TTReservoirAnima
     configTTTotalAnima = self.db.profile.TTTotalAnima
     configCountBankedAnima = self.db.profile.countBankedAnima
@@ -409,6 +443,16 @@ function StoredAnimaCounter:GetShowIcon(info)
     return configShowIcon
 end
 
+function StoredAnimaCounter:SetTTStoredAnima(info, toggle)
+    configTTStoredAnima = toggle
+    self.db.profile.TTStoredAnima = toggle
+    StoredAnimaCounter:OutputValue()
+end
+
+function StoredAnimaCounter:GetTTStoredAnima(info)
+    return configTTStoredAnima
+end
+
 function StoredAnimaCounter:SetTTBaggedAnima(info, toggle)
     configTTBaggedAnima = toggle
     self.db.profile.TTBaggedAnima = toggle
@@ -439,6 +483,16 @@ end
 
 function StoredAnimaCounter:GetTTTotalAnima(info)
     return configTTTotalAnima
+end
+
+function StoredAnimaCounter:SetTTBankedAnima(info, toggle)
+    configTTBankedAnima = toggle
+    self.db.profile.TTBankedAnima = toggle
+    StoredAnimaCounter:OutputValue()
+end
+
+function StoredAnimaCounter:GetTTBankedAnima(info)
+    return configTTBankedAnima
 end
 
 function StoredAnimaCounter:SetCustomFormat(info, input)
@@ -622,22 +676,30 @@ end
 local NORMAL_FONT_COLOR = {1.0, 0.82, 0.0}
 
 function ldbObject:OnTooltipShow()
-    local stored, pool, sum
+    local stored, pool, sum, banked, bagged
     if configBreakLargeNumbers then
         stored = BreakUpLargeNumbers(StoredAnimaCounter:GetStoredAnima())
         pool = BreakUpLargeNumbers(GetReservoirAnima())
         sum = BreakUpLargeNumbers(GetReservoirAnima() + StoredAnimaCounter:GetStoredAnima())
+        banked = BreakUpLargeNumbers(bankedAnima)
+        bagged = BreakUpLargeNumbers(baggedAnima)
     else
         stored = StoredAnimaCounter:GetStoredAnima()
         pool = GetReservoirAnima()
         sum = GetReservoirAnima() + StoredAnimaCounter:GetStoredAnima()
+        banked = bankedAnima
+        bagged = baggedAnima
     end
 
     self:AddLine("|cFF2C94FEStored Anima|r")
     self:AddLine("An overview of anima stored in your bags, but not yet added to your covenant's reservoir.", 1.0, 0.82,
         0.0, 1)
     self:AddLine("\n")
-    self:AddDoubleLine("Stored:", "|cFFFFFFFF" .. stored .. "|r")
+    self:AddDoubleLine("Bags:", "|cFFFFFFFF" .. bagged .. "|r")
+    if (configCountBankedAnima) then
+        self:AddDoubleLine("Bank:", "|cFFFFFFFF" .. banked .. "|r")
+        self:AddDoubleLine("Stored (bag+bank):", "|cFFFFFFFF" .. stored .. "|r")
+    end
     self:AddDoubleLine("Reservoir:", "|cFFFFFFFF" .. pool .. "|r")
     self:AddDoubleLine("Total:", "|cFFFFFFFF" .. sum .. "|r")
 end
