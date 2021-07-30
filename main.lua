@@ -125,6 +125,8 @@ function StoredAnimaCounter:OnInitialize()
 end
 
 function StoredAnimaCounter:OnEnable()
+    StoredAnimaCounter:RefreshConfig()
+
     if worldListener == nil then
         worldListener = self:RegisterEvent("PLAYER_ENTERING_WORLD", "ScanForStoredAnimaDelayed")
     end
@@ -140,12 +142,10 @@ function StoredAnimaCounter:OnEnable()
     if bankListener == nil then
         bankListener = self:RegisterBucketEvent("BANKFRAME_OPENED", 0.2, "ScanBankForStoredAnima")
     end
-
-    StoredAnimaCounter:RefreshConfig()
 end
 
 function StoredAnimaCounter:ScanChange(events)
-    for bagId,_ in pairs(events) do 
+    for bagId,val in pairs(events) do 
         if (bagId == -1 or (bagId > NUM_BAG_SLOTS and bagId <= NUM_BAG_SLOTS+NUM_BANKBAGSLOTS)) then
             StoredAnimaCounter:ScanBankForStoredAnima()
         elseif (bagId >= 0 and bagId <= NUM_BAG_SLOTS) then
@@ -370,7 +370,7 @@ function StoredAnimaCounter:RefreshConfig()
     configTTReservoirAnima = self.db.profile.TTReservoirAnima
     configTTTotalAnima = self.db.profile.TTTotalAnima
     configCountBankedAnima = self.db.profile.countBankedAnima
-    bankedAnima = self.db.profile.bankedAnima or 0
+    bankedAnima = self.db.profile.bankedAnima
     StoredAnimaCounter:SetUpHooks()
     StoredAnimaCounter:ScanForStoredAnima()
 end
@@ -528,22 +528,28 @@ end
 function StoredAnimaCounter:ScanBankForStoredAnima()
     vprint("Scanning bank:")
     local total = 0
+    local bankReadable = false;
     -- Bank base container first
     local slots = GetContainerNumSlots(BANK_CONTAINER)
+    bankReadable = slots > 0;
     for slot = 1, slots do
         total = total + (StoredAnimaCounter:CountAnima(BANK_CONTAINER, slot))
     end
     -- Other bank bags
     for bag = (NUM_BAG_SLOTS + 1), (NUM_BAG_SLOTS+NUM_BANKBAGSLOTS) do
         local slots = GetContainerNumSlots(bag)
+        bankReadable = bankReadable and (slots > 0);
         for slot = 1, slots do
             total = total + (StoredAnimaCounter:CountAnima(bag, slot))
         end
     end
 
-    bankedAnima = total or 0
-    -- Store banked anima in DB
-    self.db.profile.bankedAnima = total or 0
+    if bankReadable then 
+        bankedAnima = total
+        StoredAnimaCounter.db.profile.bankedAnima = total
+    else
+        bankedAnima = StoredAnimaCounter.db.profile.bankedAnima or 0
+    end
 
     StoredAnimaCounter:OutputValue()
 end
