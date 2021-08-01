@@ -87,7 +87,7 @@ function StoredAnimaCounter:SetUpHooks()
                     bagged = BreakUpLargeNumbers(baggedAnima)
                     banked = BreakUpLargeNumbers(bankedAnima)
                 else
-                    stored = ldbObject.value
+                    stored = StoredAnimaCounter:GetStoredAnima()
                     pool = GetReservoirAnima()
                     sum = GetReservoirAnima() + StoredAnimaCounter:GetStoredAnima()
                     bagged = baggedAnima
